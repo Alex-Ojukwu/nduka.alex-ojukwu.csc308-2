@@ -34,7 +34,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     // Initialize the FrameBufferWriter
     let mut frame_buffer_writer = FrameBufferWriter::new(buffer, frame_buffer_info);
 
-    // Center "Hello World!" on the screen
+    // Center "Mente Cuerpo y Alma!!" on the screen
     let text_1 = "Mente Cuerpo y Alma!";
     let text_1_width = text_1.len() * writer::constants::font_constants::CHAR_RASTER_WIDTH;
     let text_1_height = writer::constants::font_constants::CHAR_RASTER_HEIGHT.val();
@@ -45,7 +45,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     frame_buffer_writer.set_color(TextColor::Green);
     writeln!(frame_buffer_writer, "{}", text_1).unwrap();
 
-    // Center the tabbed line below "Hello World!"
+    // Center the tabbed line below "Mente Cuerpo y Alma!!"
     let text_2 = "This is an example of\t tabbed Line";
     let text_2_width = text_2.len() * writer::constants::font_constants::CHAR_RASTER_WIDTH;
     let text_2_height = writer::constants::font_constants::CHAR_RASTER_HEIGHT.val();
