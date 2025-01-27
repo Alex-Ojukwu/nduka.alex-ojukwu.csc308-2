@@ -15,4 +15,5 @@ fn main() {
     }
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();
+    
 }
