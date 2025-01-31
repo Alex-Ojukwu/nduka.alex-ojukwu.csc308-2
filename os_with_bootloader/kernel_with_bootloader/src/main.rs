@@ -6,12 +6,10 @@ mod writer;
 use bootloader_api::{config::Mapping, BootloaderConfig, BootInfo};
 use writer::{FrameBufferWriter, TextColor};
 use x86_64::instructions::hlt;
-use core::fmt::Write; // Required for the macros
+use core::fmt::Write;
 
-// Use the `entry_point` macro to register the entry point function.
 bootloader_api::entry_point!(kernel_main);
 
-// Define a custom bootloader configuration.
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
     config.mappings.physical_memory = Some(Mapping::Dynamic);
@@ -19,53 +17,65 @@ pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     config
 };
 
-// Define the entry point function.
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
-    // Retrieve framebuffer info and buffer
-    let framebuffer = boot_info.framebuffer.as_mut().unwrap_or_else(|| {
-        loop {
-            hlt(); // Halt if framebuffer is unavailable
-        }
-    });
-
-    let frame_buffer_info = framebuffer.info();
+    let framebuffer = boot_info
+        .framebuffer
+        .as_mut()
+        .unwrap_or_else(|| loop { hlt(); });
+    let fb_info = framebuffer.info();
     let buffer = framebuffer.buffer_mut();
+    let mut frame_buffer_writer = FrameBufferWriter::new(buffer, fb_info);
 
-    // Initialize the FrameBufferWriter
-    let mut frame_buffer_writer = FrameBufferWriter::new(buffer, frame_buffer_info);
+    // Use a raw string literal so that our custom escape sequences are preserved.
+    print!(
+        &mut frame_buffer_writer,
+        r"watashi no Soul Society!\nTesting Testing Tester Tested.\n\cBlue Blue Text\tTabbed Text"
+    );
 
-    // Center "Mente Cuerpo y Alma!!" on the screen
-    let text_1 = "Mente Cuerpo y Alma!";
-    let text_1_width = text_1.len() * writer::constants::font_constants::CHAR_RASTER_WIDTH;
-    let text_1_height = writer::constants::font_constants::CHAR_RASTER_HEIGHT.val();
-    let text_1_x = (frame_buffer_writer.width() - text_1_width) / 2;
-    let text_1_y = (frame_buffer_writer.height() - text_1_height) / 2;
-
-    frame_buffer_writer.set_cursor_position(text_1_x as isize, text_1_y as isize);
-    frame_buffer_writer.set_color(TextColor::Green);
-    writeln!(frame_buffer_writer, "{}", text_1).unwrap();
-
-    // Center the tabbed line below "Mente Cuerpo y Alma!!"
-    let text_2 = "This is an example of\t tabbed Line";
-    let text_2_width = text_2.len() * writer::constants::font_constants::CHAR_RASTER_WIDTH;
-    let text_2_height = writer::constants::font_constants::CHAR_RASTER_HEIGHT.val();
-    let text_2_x = (frame_buffer_writer.width() - text_2_width) / 2;
-    let text_2_y = text_1_y + text_1_height + 5; // Add 5 pixels as vertical spacing
-
-    frame_buffer_writer.set_cursor_position(text_2_x as isize, text_2_y as isize);
-    frame_buffer_writer.set_color(TextColor::Yellow);
-    writeln!(frame_buffer_writer, "{}", text_2).unwrap();
-
-    // Halt the CPU to prevent unnecessary busy looping
     loop {
         hlt();
     }
 }
 
-// Define the panic handler to handle panics gracefully.
+macro_rules! print {
+    ($writer:expr, $($arg:tt)*) => {{
+        // Format the input into a single string.
+        let formatted = format!($($arg)*);
+        let mut chars = formatted.chars().peekable();
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                if let Some(next) = chars.next() {
+                    match next {
+                        'n' => $writer.newline(),
+                        't' => $writer.write_tab(),
+                        'c' => {
+                            // Gather alphabetic characters for the color name.
+                            let mut color_name = String::new();
+                            while let Some(&ch) = chars.peek() {
+                                if ch.is_alphabetic() {
+                                    color_name.push(ch);
+                                    chars.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                            if let Some(color) = TextColor::from_str(&color_name) {
+                                $writer.set_color(color);
+                            }
+                        }
+                        other => $writer.write_char(other),
+                    }
+                }
+            } else {
+                $writer.write_char(c);
+            }
+        }
+    }};
+}
+
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {
-        hlt(); // Halt in an infinite loop on panic.
+        hlt();
     }
 }
